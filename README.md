@@ -1,4 +1,163 @@
-# Markdown 渲染组件
+# Markdown Parse Vue
+
+A Vue 3 based Markdown rendering component that supports code highlighting, tables, Mermaid diagrams, and ECharts.
+
+## Features
+
+- Standard Markdown syntax support
+- Code highlighting
+- Table rendering
+- Mermaid diagram support
+- ECharts support
+- Custom code block rendering
+- Custom renderers
+- Rich configuration options
+- TypeScript support
+
+## Installation
+
+```bash
+npm install markdown-parse-vue
+```
+
+## Usage
+
+```vue
+<template>
+  <MarkdownRender
+    :content="markdown"
+    :codeBlockTypes="customCodeBlocks"
+    :markdownOptions="markdownOptions"
+    :mermaidOptions="mermaidOptions"
+    :echartsOptions="echartsOptions"
+    :customRenderers="customRenderers"
+    @error="handleError"
+    @render="handleRender"
+  />
+</template>
+
+<script setup lang="ts">
+import 'markdown-parse-vue/style.css'
+import { MarkdownRender } from 'markdown-parse-vue'
+
+// See configuration examples below
+</script>
+```
+
+## Configuration Options
+
+### MarkdownRenderProps
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|----------|-------------|
+| content | string | Yes | - | Markdown content |
+| codeBlockTypes | CodeBlockType[] | No | [] | Custom code block type configuration |
+| markdownOptions | object | No | {} | Markdown-it configuration options |
+| mermaidOptions | object | No | {} | Mermaid configuration options |
+| echartsOptions | object | No | {} | ECharts configuration options |
+| customRenderers | object | No | {} | Custom renderers |
+| onError | function | No | - | Error handling callback |
+| onRender | function | No | - | Render completion callback |
+
+### CodeBlockType
+
+```typescript
+interface CodeBlockType {
+  name: string              // Code block type name
+  startMarker: RegExp       // Start marker regex
+  endMarker: RegExp         // End marker regex
+  validate?: (content: string) => boolean  // Content validation function
+  message?: string          // Loading message
+  render?: (content: string) => JSX.Element | null  // Custom render function
+}
+```
+
+### Configuration Examples
+
+```typescript
+// Custom code blocks
+const customCodeBlocks = [
+  {
+    name: 'custom',
+    startMarker: /^```custom\s*$/,
+    endMarker: /^```$/,
+    validate: content => content.length > 0,
+    message: 'Custom rendering...',
+    render: content => (
+      <div class="custom-block">{content}</div>
+    ),
+  },
+]
+
+// Markdown configuration
+const markdownOptions = {
+  html: true,
+  breaks: true,
+  linkify: true,
+  typographer: true,
+  highlight: (str, lang) => {
+    // Code highlighting configuration
+  },
+}
+
+// Mermaid configuration
+const mermaidOptions = {
+  theme: 'default',
+  flowchart: {
+    curve: 'basis',
+  },
+  sequence: {
+    showSequenceNumbers: true,
+  },
+}
+
+// ECharts configuration
+const echartsOptions = {
+  renderer: 'canvas',
+  devicePixelRatio: window.devicePixelRatio,
+  useUTC: false,
+}
+
+// Custom renderers
+const customRenderers = {
+  text: content => (
+    <div class="custom-text">{content}</div>
+  ),
+  table: content => (
+    <div class="custom-table">{content}</div>
+  ),
+}
+```
+
+## Events
+
+### onError
+
+Error handling callback function.
+
+```typescript
+function handleError(error: Error) {
+  console.error('Render error:', error)
+}
+```
+
+### onRender
+
+Render completion callback function.
+
+```typescript
+function handleRender(type: string, content: string) {
+  console.log(`Render type: ${type}`, content)
+}
+```
+
+## License
+
+MIT
+
+---
+
+# Markdown Parse Vue (中文文档)
 
 一个基于 Vue 3 的 Markdown 渲染组件，支持代码高亮、表格、Mermaid 图表和 ECharts 图表。
 
@@ -37,6 +196,7 @@ npm install markdown-parse-vue
 </template>
 
 <script setup lang="ts">
+import 'markdown-parse-vue/style.css'
 import { MarkdownRender } from 'markdown-parse-vue'
 
 // 配置示例见下文

@@ -5,15 +5,41 @@ import {
   watchEffect,
   PropType,
   VNode,
+  Component,
+  h,
 } from 'vue'
 import TextRender from './TextRender'
 import TableRender from './TableRender'
 import MermaidRender from './MermaidRender'
 import EChartsRender from './EChartsRender'
-import './MarkdownRender.scss'
+import HtmlRender from './HtmlRender'
+import '@/assets/styles/MarkdownRender.scss'
+
+// 渲染器接口
+interface Renderer {
+  name: string
+  component: Component
+  validate?: (content: string) => boolean
+  transform?: (content: string) => string
+  options?: Record<string, any>
+  message?: string
+}
+
+// 渲染器组件Props接口
+interface RendererProps {
+  content: string
+  onError?: (error: Error) => void
+  onRender?: (content: string) => void
+  [key: string]: any
+}
+
+// 自定义渲染器接口
+interface CustomRenderer extends Omit<Renderer, 'transform' | 'options'> {
+  message?: string
+}
 
 export interface ContentBlock {
-  type: 'text' | 'table' | 'mermaid' | 'echarts' | string
+  type: 'text' | 'table' | 'mermaid' | 'echarts' | 'html' | string
   content: string
   valid?: boolean
   open?: boolean
@@ -301,45 +327,69 @@ export default defineComponent({
       return mergeTextBlocks(blocks)
     })
 
-    function uuid() {
-      return (
-        Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15)
-      )
-    }
+    // 注册内置渲染器
+    const builtinRenderers: Renderer[] = [
+      {
+        name: 'text',
+        component: TextRender,
+        options: props.markdownOptions,
+      },
+      {
+        name: 'table',
+        component: TableRender,
+      },
+      {
+        name: 'mermaid',
+        component: MermaidRender,
+        options: props.mermaidOptions,
+        validate: (content: string) => content.trim().length > 0,
+      },
+      {
+        name: 'echarts',
+        component: EChartsRender,
+        options: props.echartsOptions,
+        validate: (content: string) => content.trim().length > 0,
+      },
+      {
+        name: 'html',
+        component: HtmlRender,
+        validate: (content: string) => content.trim().length > 0,
+      },
+    ]
 
-    // 使用自定义渲染器
+    // 合并自定义渲染器
+    const allRenderers = computed(() => {
+      const customRenderers: CustomRenderer[] = props.codeBlockTypes?.map(type => ({
+        name: type.name,
+        component: type.render ? { render: () => type.render!(props.content) } : TextRender,
+        validate: type.validate,
+        message: type.message,
+      })) || []
+
+      return [...builtinRenderers, ...customRenderers]
+    })
+
+    // 渲染块的核心函数
     const renderBlock = (block: ContentBlock) => {
-      // 使用自定义渲染器（如果存在）
+      // 首先检查是否有自定义渲染器
       if (props.customRenderers?.[block.type]) {
         return props.customRenderers[block.type]!(block.content)
       }
 
-      // 默认渲染逻辑
-      if (block.type === 'text') {
-        return (
-          <TextRender
-            content={block.content}
-            options={props.markdownOptions}
-          />
-        )
+      // 查找对应的渲染器
+      const renderer = allRenderers.value.find(r => r.name === block.type)
+      
+      if (!renderer) {
+        return <TextRender content={block.content} />
       }
 
-      if (block.type === 'table') {
-        return <TableRender content={block.content} />
-      }
-
-      if (
-        block.open &&
-        allCodeBlockTypes.value.map((t) => t.name).includes(block.type)
-      ) {
+      // 如果是打开状态的代码块，显示加载状态
+      if (block.open) {
         return (
           <div class='loading-block'>
             <div class='loading-wrapper'>
               <div class='loading-spinner' />
-              <span class='loading-text'>
-                {block.message || '代码生成中...'}
-              </span>
+              <span class='loading-text'>{block.message || renderer.message || '代码生成中...'}</span>
             </div>
             <div class='no-end-content'>
               <div class='code-block'>
@@ -360,43 +410,30 @@ export default defineComponent({
         )
       }
 
-      if (block.type === 'mermaid' && block.valid && !block.open) {
-        return (
-          <MermaidRender
-            content={block.content}
-            options={props.mermaidOptions}
-            onError={props.onError}
-            onRender={(content) => props.onRender?.('mermaid', content)}
-          />
-        )
+      // 验证内容
+      if (renderer.validate && !renderer.validate(block.content)) {
+        return <TextRender content={block.content} />
       }
 
-      if (block.type === 'echarts' && block.valid && !block.open) {
-        return (
-          <EChartsRender
-            content={block.content}
-            options={props.echartsOptions}
-            onError={props.onError}
-            onRender={(content) => props.onRender?.('echarts', content)}
-          />
-        )
-      }
+      // 转换内容（如果需要）
+      const finalContent = 'transform' in renderer && typeof renderer.transform === 'function'
+        ? renderer.transform(block.content)
+        : block.content
 
-      // 自定义代码块渲染
-      const customBlock = allCodeBlockTypes.value.find(
-        (t) => t.name === block.type
-      )
-      if (customBlock?.render && block.valid && !block.open) {
-        try {
-          return customBlock.render(block.content)
-        } catch (error) {
-          props.onError?.(error as Error)
-          return <TextRender content={block.content} />
+      // 渲染内容
+      try {
+        const componentProps: RendererProps = {
+          content: finalContent,
+          onError: props.onError,
+          onRender: (content: string) => props.onRender?.(block.type, content),
+          ...(('options' in renderer && renderer.options) || {})
         }
-      }
 
-      // 降级为文本渲染
-      return <TextRender content={block.content} />
+        return h(renderer.component, componentProps)
+      } catch (error) {
+        props.onError?.(error as Error)
+        return <TextRender content={block.content} />
+      }
     }
 
     return () => (

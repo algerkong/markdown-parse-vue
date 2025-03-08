@@ -3,7 +3,7 @@ import { marked } from 'marked'
 import { markedHighlight } from "marked-highlight"
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
-import './TextRender.scss'
+import '@/assets/styles/TextRender.scss'
 
 export interface TextRenderProps {
   content: string

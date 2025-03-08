@@ -10,7 +10,7 @@ import {
 } from 'vue'
 import mermaid from 'mermaid'
 import panzoom from 'panzoom'
-import './MermaidRender.scss'
+import '@/assets/styles/MermaidRender.scss'
 
 export interface MermaidRenderProps {
   /** Mermaid 图表内容 */

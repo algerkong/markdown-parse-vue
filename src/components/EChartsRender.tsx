@@ -1,7 +1,6 @@
 import { defineComponent, computed, nextTick, onMounted, ref, watch, PropType, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
-import panzoom from 'panzoom'
-import './EChartsRender.scss'
+import '@/assets/styles/EChartsRender.scss'
 
 export interface EChartsRenderProps {
   /** ECharts 配置内容 */
@@ -115,8 +114,7 @@ export default defineComponent({
       // 创建新实例，使用配置选项
       chart.value = echarts.init(chartContainer.value, props.options?.theme, {
         renderer: props.options?.renderer || 'canvas',
-        devicePixelRatio: props.options?.devicePixelRatio,
-        useUTC: props.options?.useUTC,
+        devicePixelRatio: props.options?.devicePixelRatio
       })
 
       try {

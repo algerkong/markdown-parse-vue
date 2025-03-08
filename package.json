@@ -1,13 +1,27 @@
 {
   "name": "markdown-parse-vue",
-  "version": "0.1.0",
-  "description": "Vue3 Markdown 渲染组件，支持 TSX",
-  "main": "dist/index.js",
+  "version": "0.2.2",
+  "description": "Vue3 Markdown rendering component with TSX support",
+  "main": "dist/index.cjs",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "style": "dist/style.css",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./dist/*": "./dist/*",
+    "./style.css": "./dist/style.css"
+  },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
@@ -31,6 +45,7 @@
   },
   "devDependencies": {
     "@types/markdown-it": "^13.0.0",
+    "@types/node": "^22.13.1",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vitejs/plugin-vue-jsx": "^4.1.1",
     "@vue/runtime-dom": "^3.0.0",

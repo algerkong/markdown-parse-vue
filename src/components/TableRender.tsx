@@ -1,6 +1,6 @@
 import { defineComponent, computed, PropType } from 'vue'
 import MarkdownIt from 'markdown-it'
-import './TableRender.scss'
+import '@/assets/styles/TableRender.scss'
 
 export interface TableRenderProps {
   content: string
