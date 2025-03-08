@@ -112,7 +112,7 @@ export default defineComponent({
         chart.value.dispose()
       }
 
-      // 创建新实例
+      // 创建新实例，使用配置选项
       chart.value = echarts.init(chartContainer.value, props.options?.theme, {
         renderer: props.options?.renderer || 'canvas',
         devicePixelRatio: props.options?.devicePixelRatio,

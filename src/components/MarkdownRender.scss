@@ -3,4 +3,181 @@
   line-height: 1.6;
 }
 
-// ... 保持原有的样式不变 
+
+.loading-block {
+  position: relative;
+  width: 100%;
+  height: 400px;
+}
+
+.loading-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: #fafafa58;
+  border-radius: 8px;
+  gap: 16px;
+  height: 100%;
+  box-sizing: border-box;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+}
+
+.no-end-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: #1e1e1e;
+  color: #ffffff;
+  border-radius: 8px;
+  z-index: 100;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #2a6ee9;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  font-size: 24px;
+  font-weight: bold;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  margin: 12px;
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 8px;
+  color: #f5222d;
+  font-size: 14px;
+  line-height: 1.5;
+  box-sizing: border-box;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+
+  i {
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.code-block {
+  width: 100%;
+  background: #2d2d2d;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid #4d4d4d;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: 100%;
+  background: #1e1e1e;
+}
+
+.code-title {
+  color: #cccccc;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.code-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.control {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+
+  &.close {
+    background: #ff5f56;
+  }
+
+  &.minimize {
+    background: #ffbd2e;
+  }
+
+  &.maximize {
+    background: #27c93f;
+  }
+}
+
+.code-content {
+  margin: 0;
+  padding: 16px;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #00b176;
+  position: absolute;
+  bottom: 0;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #2d2d2d;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #4d4d4d;
+    border-radius: 4px;
+
+    &:hover {
+      background: #5d5d5d;
+    }
+  }
+}

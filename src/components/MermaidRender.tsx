@@ -75,29 +75,18 @@ export default defineComponent({
 
     const cleanMermaidContent = computed(() => {
       try {
-        const content = props.content
+        return props.content
           .replace(/```mermaid\n/, '')
           .replace(/```$/, '')
           .trim()
-        return content || ''
       } catch (error) {
         console.error('Error extracting mermaid content:', error)
         return ''
       }
     })
 
-    watch(cleanMermaidContent, (newContent) => {
-      if (!newContent) {
-        hasError.value = true
-        errorMessage.value = '图表内容为空'
-      } else {
-        hasError.value = false
-        errorMessage.value = ''
-      }
-    })
-
     function initPanzoom() {
-      if (!mermaidContainer.value) return
+      if (!mermaidContainer.value || !isFullscreen.value) return
 
       if (panzoomInstance.value) {
         panzoomInstance.value.dispose()
@@ -108,117 +97,79 @@ export default defineComponent({
         minZoom: MIN_SCALE,
         zoomDoubleClickSpeed: 1,
         beforeWheel: (e) => {
-          if (isFullscreen.value) {
-            e.preventDefault()
-            return false
-          }
+          e.preventDefault()
           return true
-        },
-        beforeMouseDown: (e) => {
-          return e.button !== 0
         },
         smoothScroll: false,
         zoomSpeed: 0.1,
       })
 
-      panzoomInstance.value.on(
-        'zoom',
-        (e: { getTransform: () => { scale: number } }) => {
-          scale.value = e.getTransform().scale
+      panzoomInstance.value.on('zoom', (e) => {
+        const transform = (e as any).getTransform()
+        scale.value = transform.scale
+      })
+    }
+
+    async function renderMermaid() {
+      if (!cleanMermaidContent.value || !mermaidContainer.value) return
+
+      try {
+        isLoading.value = true
+        hasError.value = false
+
+        // 初始化 Mermaid 配置
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: props.options?.theme || 'default',
+          flowchart: {
+            useMaxWidth: true,
+            curve: props.options?.flowchart?.curve || 'basis',
+          },
+          sequence: props.options?.sequence || { showSequenceNumbers: true },
+          gantt: props.options?.gantt,
+        })
+
+        const { svg } = await mermaid.render(
+          mermaidId.value,
+          cleanMermaidContent.value
+        )
+
+        if (mermaidContainer.value) {
+          mermaidContainer.value.innerHTML = svg
+          initPanzoom()
+          props.onRender?.(cleanMermaidContent.value)
         }
-      )
+      } catch (error) {
+        console.error('Mermaid rendering error:', error)
+        hasError.value = true
+        errorMessage.value = error instanceof Error ? error.message : '图表渲染失败'
+        props.onError?.(error as Error)
+      } finally {
+        isLoading.value = false
+      }
     }
 
     async function toggleFullscreen() {
       isFullscreen.value = !isFullscreen.value
       await nextTick()
-
-      if (isFullscreen.value) {
-        initPanzoom()
-      } else {
-        if (panzoomInstance.value) {
-          panzoomInstance.value.zoomAbs(0, 0, 1)
-          panzoomInstance.value.moveTo(0, 0)
-          scale.value = 1
-          panzoomInstance.value.dispose()
-          panzoomInstance.value = null
-        }
-      }
+      initPanzoom()
     }
 
     function resetZoom() {
       if (panzoomInstance.value) {
         panzoomInstance.value.zoomAbs(0, 0, 1)
         panzoomInstance.value.moveTo(0, 0)
+        scale.value = 1
       }
     }
 
-    async function renderMermaid() {
-      try {
-        const content = cleanMermaidContent.value
-        if (!content || !mermaidContainer.value) return
+    // 监听内容和配置变化
+    watch([() => props.content, () => props.options], () => {
+      nextTick().then(renderMermaid)
+    }, { deep: true })
 
-        isLoading.value = true
-        hasError.value = false
-
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: props.options?.theme || 'default',
-          securityLevel: 'loose',
-          logLevel: 1,
-          flowchart: props.options?.flowchart,
-          sequence: props.options?.sequence,
-          gantt: props.options?.gantt,
-        })
-
-        if (mermaidContainer.value) {
-          mermaidContainer.value.innerHTML = ''
-        }
-
-        const tempContainer = document.createElement('div')
-        tempContainer.style.visibility = 'hidden'
-        document.body.appendChild(tempContainer)
-
-        try {
-          const { svg } = await mermaid.render(mermaidId.value, content)
-          
-          if (mermaidContainer.value) {
-            mermaidContainer.value.innerHTML = svg
-            props.onRender?.(content)
-          }
-        } catch (error) {
-          props.onError?.(error as Error)
-          throw error
-        } finally {
-          document.body.removeChild(tempContainer)
-        }
-
-        isLoading.value = false
-      } catch (error) {
-        console.error('Mermaid rendering error:', error)
-        hasError.value = true
-        errorMessage.value =
-          error instanceof Error ? error.message : '图表渲染失败'
-        props.onError?.(error as Error)
-        isLoading.value = false
-      }
-    }
-
-    watch(
-      () => props.content,
-      () => {
-        if (mermaidContainer.value) {
-          nextTick().then(renderMermaid)
-        }
-      },
-      { immediate: false }
-    )
-
-    onMounted(async () => {
-      await nextTick()
-      if (mermaidContainer.value) {
-        renderMermaid()
-      }
+    onMounted(() => {
+      nextTick().then(renderMermaid)
     })
 
     onUnmounted(() => {
@@ -229,8 +180,8 @@ export default defineComponent({
 
     return () => (
       <div class={['mermaid-render', { 'is-fullscreen': isFullscreen.value }]}>
-        <div class='toolbar'>
-          <button class='toolbar-btn' onClick={toggleFullscreen}>
+        <div class="toolbar">
+          <button class="toolbar-btn" onClick={toggleFullscreen}>
             <i
               class={
                 isFullscreen.value
@@ -241,32 +192,30 @@ export default defineComponent({
           </button>
           {isFullscreen.value && (
             <>
-              <button class='toolbar-btn' onClick={resetZoom}>
-                <i class='ri-refresh-line' />
+              <button class="toolbar-btn" onClick={resetZoom}>
+                <i class="ri-refresh-line" />
               </button>
-              <span class='zoom-text'>{Math.round(scale.value * 100)}%</span>
+              <span class="zoom-text">{Math.round(scale.value * 100)}%</span>
             </>
           )}
         </div>
 
         {isLoading.value ? (
-          <div class='loading-wrapper'>
-            <div class='loading-spinner' />
-            <span class='loading-text'>图表生成中</span>
+          <div class="loading-wrapper">
+            <div class="loading-spinner" />
+            <span class="loading-text">图表生成中</span>
           </div>
-        ) : (
-          hasError.value && (
-            <div class='error-message'>
-              <i class='ri-error-warning-line' />
-              {errorMessage.value}
-            </div>
-          )
-        )}
+        ) : hasError.value ? (
+          <div class="error-message">
+            <i class="ri-error-warning-line" />
+            {errorMessage.value}
+          </div>
+        ) : null}
 
         <div
           class={['mermaid-container', { 'is-fullscreen': isFullscreen.value }]}
         >
-          <div ref={mermaidContainer} class='mermaid-content' />
+          <div ref={mermaidContainer} class="mermaid-content" />
         </div>
       </div>
     )

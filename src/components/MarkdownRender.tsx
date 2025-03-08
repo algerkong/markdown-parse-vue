@@ -1,9 +1,24 @@
-import { defineComponent, computed, ref, watchEffect, PropType } from 'vue'
+import {
+  defineComponent,
+  computed,
+  ref,
+  watchEffect,
+  PropType,
+  VNode,
+} from 'vue'
 import TextRender from './TextRender'
 import TableRender from './TableRender'
 import MermaidRender from './MermaidRender'
 import EChartsRender from './EChartsRender'
 import './MarkdownRender.scss'
+
+export interface ContentBlock {
+  type: 'text' | 'table' | 'mermaid' | 'echarts' | string
+  content: string
+  valid?: boolean
+  open?: boolean
+  message?: string
+}
 
 export interface CodeBlockType {
   /** 代码块类型名称 */
@@ -17,7 +32,7 @@ export interface CodeBlockType {
   /** 加载提示信息 */
   message?: string
   /** 自定义渲染函数 */
-  render?: (content: string) => JSX.Element | null
+  render?: (content: string) => VNode | null
 }
 
 export interface MarkdownRenderProps {
@@ -74,11 +89,11 @@ export interface MarkdownRenderProps {
   /** 自定义渲染器 */
   customRenderers?: {
     /** 自定义文本渲染 */
-    text?: (content: string) => JSX.Element
+    text?: (content: string) => VNode
     /** 自定义表格渲染 */
-    table?: (content: string) => JSX.Element
+    table?: (content: string) => VNode
     /** 自定义代码块渲染 */
-    [key: string]: ((content: string) => JSX.Element) | undefined
+    [key: string]: ((content: string) => VNode) | undefined
   }
   /** 事件回调 */
   onError?: (error: Error) => void
@@ -127,7 +142,6 @@ export default defineComponent({
         name: 'echarts',
         startMarker: /^```echarts\s*$/,
         endMarker: /^```$/,
-        validate: content => /option\s*[:=]/.test(content),
         message: '图表生成中',
       },
       {
@@ -161,7 +175,7 @@ export default defineComponent({
     }
 
     function convertToText(content: string): ContentBlock[] {
-      return content.split('\n').map(line => createTextBlock(line))
+      return content.split('\n').map((line) => createTextBlock(line))
     }
 
     function mergeTextBlocks(blocks: ContentBlock[]): ContentBlock[] {
@@ -169,8 +183,7 @@ export default defineComponent({
         const last = merged[merged.length - 1]
         if (block.type === 'text' && last?.type === 'text') {
           last.content += block.content
-        }
-        else {
+        } else {
           merged.push(block)
         }
         return merged
@@ -182,13 +195,18 @@ export default defineComponent({
       let i = startLine
       while (i < parseState.value.lines.length) {
         const line = parseState.value.lines[i]
-        if (!line.includes('|'))
-          break
+        if (!line.includes('|')) break
         content += `${line}\n`
         i++
       }
       return content.trim()
     }
+
+    // 合并内置和自定义代码块类型
+    const allCodeBlockTypes = computed(() => [
+      ...codeBlockTypes,
+      ...(props.codeBlockTypes || []),
+    ])
 
     // 核心解析逻辑
     const contentBlocks = computed<ContentBlock[]>(() => {
@@ -204,26 +222,27 @@ export default defineComponent({
           currentBlock.content += `${line}\n`
 
           // 检测结束标记
-          const blockType = codeBlockTypes.find(t => t.name === currentBlock?.type)
+          const blockType = allCodeBlockTypes.value.find(
+            (t) => t.name === currentBlock?.type
+          )
           if (blockType?.endMarker.test(line)) {
             currentBlock.open = false
-            currentBlock.valid = blockType?.validate?.(
-              currentBlock.content
-                .replace(blockType.startMarker, '')
-                .replace(blockType.endMarker, '')
-                .trim(),
-            ) ?? true
+            currentBlock.valid =
+              blockType?.validate?.(
+                currentBlock.content
+                  .replace(blockType.startMarker, '')
+                  .replace(blockType.endMarker, '')
+                  .trim()
+              ) ?? true
 
             if (currentBlock.valid) {
               blocks.push(currentBlock)
-            }
-            else {
+            } else {
               currentBlock.message = blockType?.message ?? '图表生成中'
               blocks.push(...convertToText(currentBlock.content))
             }
             currentBlock = null
-          }
-          else {
+          } else {
             // 未闭合时保持 open 状态
             currentBlock.open = true
           }
@@ -233,7 +252,7 @@ export default defineComponent({
 
         // 检测代码块起始标记
         let matchedType: CodeBlockType | undefined
-        for (const type of codeBlockTypes) {
+        for (const type of allCodeBlockTypes.value) {
           if (type.startMarker.test(line)) {
             matchedType = type
             break
@@ -249,14 +268,20 @@ export default defineComponent({
             message: matchedType.message ?? '图表生成中',
           }
           lineIndex++
-        }
-        else {
+        } else {
           // 检测表格
-          if (line.includes('|') && lineIndex + 1 < parseState.value.lines.length) {
+          if (
+            line.includes('|') &&
+            lineIndex + 1 < parseState.value.lines.length
+          ) {
             const nextLine = parseState.value.lines[lineIndex + 1]
             if (nextLine.includes('|-')) {
               const tableContent = extractTableContent(lineIndex)
-              blocks.push({ type: 'table', content: tableContent, message: '表格生成中' })
+              blocks.push({
+                type: 'table',
+                content: tableContent,
+                message: '表格生成中',
+              })
               lineIndex += tableContent.split('\n').length
               continue
             }
@@ -277,58 +302,109 @@ export default defineComponent({
     })
 
     function uuid() {
-      return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+      return (
+        Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15)
+      )
+    }
+
+    // 使用自定义渲染器
+    const renderBlock = (block: ContentBlock) => {
+      // 使用自定义渲染器（如果存在）
+      if (props.customRenderers?.[block.type]) {
+        return props.customRenderers[block.type]!(block.content)
+      }
+
+      // 默认渲染逻辑
+      if (block.type === 'text') {
+        return (
+          <TextRender
+            content={block.content}
+            options={props.markdownOptions}
+          />
+        )
+      }
+
+      if (block.type === 'table') {
+        return <TableRender content={block.content} />
+      }
+
+      if (
+        block.open &&
+        allCodeBlockTypes.value.map((t) => t.name).includes(block.type)
+      ) {
+        return (
+          <div class='loading-block'>
+            <div class='loading-wrapper'>
+              <div class='loading-spinner' />
+              <span class='loading-text'>
+                {block.message || '代码生成中...'}
+              </span>
+            </div>
+            <div class='no-end-content'>
+              <div class='code-block'>
+                <div class='code-header'>
+                  <span class='code-title'>{block.type}</span>
+                  <div class='code-controls'>
+                    <span class='control close' />
+                    <span class='control minimize' />
+                    <span class='control maximize' />
+                  </div>
+                </div>
+                <pre class='code-content'>
+                  <code innerHTML={block.content} />
+                </pre>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      if (block.type === 'mermaid' && block.valid && !block.open) {
+        return (
+          <MermaidRender
+            content={block.content}
+            options={props.mermaidOptions}
+            onError={props.onError}
+            onRender={(content) => props.onRender?.('mermaid', content)}
+          />
+        )
+      }
+
+      if (block.type === 'echarts' && block.valid && !block.open) {
+        return (
+          <EChartsRender
+            content={block.content}
+            options={props.echartsOptions}
+            onError={props.onError}
+            onRender={(content) => props.onRender?.('echarts', content)}
+          />
+        )
+      }
+
+      // 自定义代码块渲染
+      const customBlock = allCodeBlockTypes.value.find(
+        (t) => t.name === block.type
+      )
+      if (customBlock?.render && block.valid && !block.open) {
+        try {
+          return customBlock.render(block.content)
+        } catch (error) {
+          props.onError?.(error as Error)
+          return <TextRender content={block.content} />
+        }
+      }
+
+      // 降级为文本渲染
+      return <TextRender content={block.content} />
     }
 
     return () => (
-      <div class="markdown-render">
-        {contentBlocks.value.map((block) => {
-          const key = uuid()
-
-          if (block.type === 'text')
-            return <TextRender key={key} content={block.content} />
-
-          if (block.type === 'table')
-            return <TableRender key={key} content={block.content} />
-
-            if (block.open && codeBlockTypes.map(t => t.name).includes(block.type)) {
-              return (
-                <div key={key} class="loading-block">
-                  <div class="loading-wrapper">
-                    <div class="loading-spinner" />
-                    <span class="loading-text">{block.message || '代码生成中...'}</span>
-                  </div>
-                  <div class="no-end-content">
-                    <div class="code-block">
-                      <div class="code-header">
-                        <span class="code-title">{block.type}</span>
-                        <div class="code-controls">
-                          <span class="control close" />
-                          <span class="control minimize" />
-                          <span class="control maximize" />
-                        </div>
-                      </div>
-                      <pre class="code-content">
-                        <code innerHTML={block.content} />
-                    </pre>
-                  </div>
-                </div>
-              </div>
-            )
-          }
-
-          if (block.type === 'mermaid' && block.valid && !block.open)
-            return <MermaidRender key={key} content={block.content} />
-
-          if (block.type === 'echarts' && block.valid && !block.open)
-            return <EChartsRender key={key} content={block.content} />
-
-          if (['mermaid', 'echarts'].includes(block.type) && !block.valid && !block.open)
-            return <TextRender key={key} content={block.content} />
-
-          return null
-        })}
+      <div class='markdown-render'>
+        {contentBlocks.value.map((content: ContentBlock) =>
+          renderBlock(content)
+        )}
       </div>
     )
   },
-}) 
+})
